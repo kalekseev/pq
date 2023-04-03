@@ -11,8 +11,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [ '3.x', 'pypy3' ]
-        postgres-version: [ '9', 'latest' ]
+        python-version: ["3.x"]
+        postgres-version: ["11", "latest"]
 
     services:
       postgres:
@@ -22,18 +22,18 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pq_test
         ports:
-        # will assign a random free host port
-        - 5432/tcp
+          # will assign a random free host port
+          - 5432/tcp
         # needed because the postgres container does not provide a healthcheck
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - run: python -m pip install --upgrade pip setuptools wheel && python setup.py test
-      env:
-        PQ_TEST_DB_PORT: ${{ job.services.postgres.ports[5432] }}
-        PQ_TEST_DB_HOST: localhost
-        PQ_TEST_DB_PASS: postgres
+      - uses: actions/checkout@master
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip setuptools wheel && python setup.py test
+        env:
+          PQ_TEST_DB_PORT: ${{ job.services.postgres.ports[5432] }}
+          PQ_TEST_DB_HOST: localhost
+          PQ_TEST_DB_PASS: postgres
