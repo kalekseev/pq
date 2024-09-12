@@ -9,15 +9,13 @@ from logging import getLogger
 from hashlib import md5
 from weakref import WeakValueDictionary
 
-from .utils import (
-    Literal, prepared, transaction, convert_time_spec, utc_format
-)
+from .utils import Literal, prepared, transaction, convert_time_spec, utc_format
 
 
-__title__ = 'pq'
-__version__ = '1.9.1-dev'
-__author__ = 'Malthe Borch'
-__license__ = 'BSD'
+__title__ = "pq"
+__version__ = "1.9.1-dev"
+__author__ = "Malthe Borch"
+__license__ = "BSD"
 
 
 if sys.version_info[0] == 2:
@@ -29,14 +27,14 @@ else:
 class PQ(object):
     """Convenient queue manager."""
 
-    table = 'queue'
+    table = "queue"
 
     queue_class = None
 
     template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
-        queue_class = kwargs.pop('queue_class', None)
+        queue_class = kwargs.pop("queue_class", None)
         if queue_class is not None:
             self.queue_class = queue_class
         self.params = args, kwargs
@@ -54,20 +52,21 @@ class PQ(object):
             )
 
     def close(self):
-        self[''].close()
+        self[""].close()
 
     def create(self):
-        queue = self['']
+        queue = self[""]
 
-        with open(os.path.join(self.template_path, 'create.sql'), 'r') as f:
+        with open(os.path.join(self.template_path, "create.sql"), "r") as f:
             sql = f.read()
 
         with queue._transaction() as cursor:
             cursor.execute(
-                sql, {
-                    'name': Literal(queue.name),
-                    'table': queue.table,
-                }
+                sql,
+                {
+                    "name": Literal(queue.name),
+                    "table": queue.table,
+                },
             )
 
 
@@ -88,13 +87,11 @@ class QueueIterator(object):
         return self
 
     def __next__(self):
-        ''' Python 3 iterator.
-        '''
+        """Python 3 iterator."""
         return self.queue.get(timeout=self.timeout)
 
     def next(self):
-        ''' Python 2 iterator.
-        '''
+        """Python 2 iterator."""
         return QueueIterator.__next__(self)
 
 
@@ -110,18 +107,18 @@ class Queue(object):
     # Keyword arguments passed when creating a new cursor.
     cursor_kwargs = {}
 
-    logger = getLogger('pq')
+    logger = getLogger("pq")
 
     converters = {
-        'pickle': (
+        "pickle": (
             #
             # Pickle protocol 0 claims to be ASCII, but it outputs
             # characters outside of range(128). So, we treat it
             # like Latin-1 so that it can encoded into JSON UTF-8.
             #
-            lambda data: pickle.dumps(data, 0).decode('latin-1'),
-            lambda data: pickle.loads(data.encode('latin-1'))
-            ),
+            lambda data: pickle.dumps(data, 0).decode("latin-1"),
+            lambda data: pickle.loads(data.encode("latin-1")),
+        ),
     }
 
     dumps = loads = staticmethod(lambda data: data)
@@ -131,12 +128,14 @@ class Queue(object):
 
     ctx = cursor = None
 
-    def __init__(self, name, conn=None, pool=None, table='queue', schema=None, **kwargs):
+    def __init__(
+        self, name, conn=None, pool=None, table="queue", schema=None, **kwargs
+    ):
         self.conn = conn
         self.pool = pool
 
-        if '/' in name:
-            name, key = name.rsplit('/', 1)
+        if "/" in name:
+            name, key = name.rsplit("/", 1)
             self.dumps, self.loads = self.converters[key]
 
         self.name = name
@@ -187,12 +186,8 @@ class Queue(object):
                     schedule_at,
                     expected_at,
                     seconds,
-                ) = self._pull_item(
-                    cursor, block
-                )
-                self.last_timeout = (
-                    seconds or self.last_timeout or self.timeout
-                )
+                ) = self._pull_item(cursor, block)
+                self.last_timeout = seconds or self.last_timeout or self.timeout
 
             if data is not None:
                 # Reset the timeout if there's no estimation
@@ -202,8 +197,13 @@ class Queue(object):
                 decoded = self.decode(data)
 
                 return Job(
-                    job_id, self.loads(decoded), size,
-                    enqueued_at, schedule_at, expected_at, self.update
+                    job_id,
+                    self.loads(decoded),
+                    size,
+                    enqueued_at,
+                    schedule_at,
+                    expected_at,
+                    self.update,
                 )
 
             if not block:
@@ -235,7 +235,8 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._put_item(
-                cursor, self.encode(self.dumps(data)),
+                cursor,
+                self.encode(self.dumps(data)),
                 utc_format(schedule_at) if schedule_at is not None else None,
                 utc_format(expected_at) if expected_at is not None else None,
             )
@@ -244,18 +245,11 @@ class Queue(object):
         """Update job data."""
 
         with self._transaction() as cursor:
-            return self._update_item(
-                cursor, job_id, self.encode(self.dumps(data))
-            )
+            return self._update_item(cursor, job_id, self.encode(self.dumps(data)))
 
     def clear(self):
         with self._transaction() as cursor:
-            cursor.execute(
-                "DELETE FROM %s WHERE q_name = %s", (
-                    self.table,
-                    self.name
-                )
-            )
+            cursor.execute("DELETE FROM %s WHERE q_name = %s", (self.table, self.name))
 
     @contextmanager
     def _conn(self):
@@ -273,7 +267,7 @@ class Queue(object):
         if len(name) > 63:
             digest = md5(name.encode()).hexdigest()
             name = "pq_" + digest
-        cursor.execute('LISTEN "%s"', (Literal(name), ))
+        cursor.execute('LISTEN "%s"', (Literal(name),))
 
     @prepared
     def _put_item(self, cursor):
@@ -292,8 +286,8 @@ class Queue(object):
     def _update_item(self, cursor):
         """Updates a single item into the queue.
 
-            UPDATE %(table)s SET data = $2 WHERE id = $1
-            RETURNING length(data::text)
+        UPDATE %(table)s SET data = $2 WHERE id = $1
+        RETURNING length(data::text)
 
         """
 
@@ -356,9 +350,9 @@ class Queue(object):
     def _count(self, cursor):
         """Return number of items in queue.
 
-            SELECT COUNT(*) FROM %(table)s
-            WHERE q_name = %(name)s AND dequeued_at IS NULL
-              AND (schedule_at IS NULL OR schedule_at <= NOW())
+        SELECT COUNT(*) FROM %(table)s
+        WHERE q_name = %(name)s AND dequeued_at IS NULL
+          AND (schedule_at IS NULL OR schedule_at <= NOW())
 
         """
 
@@ -384,8 +378,7 @@ class Queue(object):
             self.cursor.execute("RELEASE SAVEPOINT pq")
             return
 
-        with self._conn() as conn, transaction(conn, **self.cursor_kwargs) \
-                as cursor:
+        with self._conn() as conn, transaction(conn, **self.cursor_kwargs) as cursor:
             yield cursor
 
 
@@ -393,19 +386,17 @@ class Job(object):
     """An item in the queue."""
 
     __slots__ = (
-        "_data", "_size", "_update", "id", "enqueued_at", "schedule_at",
+        "_data",
+        "_size",
+        "_update",
+        "id",
+        "enqueued_at",
+        "schedule_at",
         "expected_at",
     )
 
     def __init__(
-        self,
-        job_id,
-        data,
-        size,
-        enqueued_at,
-        schedule_at,
-        expected_at,
-        update
+        self, job_id, data, size, enqueued_at, schedule_at, expected_at, update
     ):
         self._data = data
         self._size = size
@@ -418,8 +409,9 @@ class Job(object):
     def __repr__(self):
         cls = type(self)
         return (
-            '<%s.%s id=%d size=%d enqueued_at=%r '
-            'schedule_at=%r expected_at=%r>' % (
+            "<%s.%s id=%d size=%d enqueued_at=%r "
+            "schedule_at=%r expected_at=%r>"
+            % (
                 cls.__module__,
                 cls.__name__,
                 self.id,
